@@ -1,0 +1,182 @@
+---
+title: "project"
+author: " Atharva Janardan Rajadhyaksha | Srushti Sanjay Kharat |  Niharika Dhapola "
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+
+```{r}
+#Reading data from a csv file.
+cc_data <- read.csv("CC GENERAL.csv")
+
+```
+
+```{r}
+#Imputing the data. We have replaced NA values with the median of that particular column
+cc_imputed <- cc_data %>%
+  select(-CUST_ID) %>%
+  mutate(across(everything(), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+```
+
+```{r}
+#Scaling the data to have a mean of 0 and sd of 1
+cc_scaled <- cc_imputed %>%
+  mutate(across(everything(), scale))
+```
+
+```{r}
+#Visualizing boxplots
+ggplot(cc_imputed, aes(x = factor(TENURE), y = BALANCE)) +
+  geom_boxplot() +
+  ggtitle("Boxplot of Balance Across Different Tenure Groups") +
+  xlab("Tenure") +
+  ylab("Balance")
+
+```
+
+```{r}
+ggplot(cc_imputed, aes(x = MINIMUM_PAYMENTS, y = PAYMENTS)) +
+  geom_point(alpha = 0.5) +
+  ggtitle("Scatterplot of Payments vs. Minimum Payments") +
+  xlab("Minimum Payments") +
+  ylab("Payments")
+```
+
+```{r}
+ggplot(cc_imputed, aes(x = CREDIT_LIMIT)) +
+  geom_histogram(bins = 30, fill = "red", color = "black", alpha = 0.7) +
+  ggtitle("Histogram of Credit Limits") +
+  xlab("Credit Limit") +
+  ylab("Frequency")
+
+```
+
+
+```{r}
+ggplot(cc_imputed, aes(x = CREDIT_LIMIT, y = BALANCE)) +
+  geom_point(alpha = 0.5) +
+  ggtitle("Scatterplot of Balance vs. Credit Limit") +
+  xlab("Credit Limit") +
+  ylab("Balance")
+
+```
+
+```{r}
+ggplot(cc_imputed, aes(x = PURCHASES_TRX, y = ..density..)) +
+  geom_density(fill = "red", color = "black", alpha = 0.7) +
+  ggtitle("Density Plot of Purchase Transactions") +
+  xlab("Number of Purchase Transactions") +
+  ylab("Density")
+
+```
+
+```{r}
+ggplot(cc_imputed, aes(x = INSTALLMENTS_PURCHASES, y = ONEOFF_PURCHASES)) +
+  geom_point(alpha = 0.4) +
+  ggtitle("Scatterplot of Installment Purchases vs. One-Off Purchases") +
+  xlab("Installment Purchases") +
+  ylab("One-Off Purchases")
+```
+
+```{r}
+ggplot(cc_imputed, aes(x = "", y = BALANCE)) +
+  geom_boxplot(color = "black", alpha = 0.5) +
+  ggtitle("Box Plot of One-Off Purchases") +
+  xlab("") +
+  ylab("One-Off Purchases")
+
+```
+
+```{r}
+library(tidyverse)
+library(cluster)
+library(factoextra)
+data <- select(cc_data, -c(CUST_ID))
+data <- na.omit(data)
+```
+
+```{r}
+#Scaling the data
+scaled_data <- scale(data)
+# We will be extracting 5 principal components from the data
+n_comp <- 5
+#Performing PCA and storing the results in a dataframe
+pca_result <- prcomp(scaled_data, center = TRUE, scale = TRUE, n.comp = n_comp)
+pca_data <- as.data.frame(pca_result$x)
+```
+```{r}
+#Performing WSS on the data and plotting the results.
+wss <- numeric(20)
+for (i in 1:20) {
+  wss[i] <- sum(kmeans(pca_data, centers = i)$withinss)
+}
+plot(1:20, wss, type = "b", xlab = "Number of clusters", ylab = "Within cluster sum of squares")
+
+```
+```{r}
+#Creating a tibble of the information about the PCA results found earlier.
+#PVE is the proportion of variance explained by each principal component.
+PVE <- tibble(
+  PC=1:length(pca_result$sdev),
+  Var=pca_result$sdev^2,
+  PVE=Var/sum(Var),
+  CumPVE=cumsum(PVE)
+)
+PVE
+
+
+#1/number of var
+# Plotting a comparative grid of PVE vs Cumulative PVE using qplot
+cowplot::plot_grid(
+qplot(data=PVE,x=PC,y=PVE,geom=c("point","line"),
+      xlab = "Principal Component",
+      ylab = "Proportion of Variance Explained"),
+qplot(data=PVE,x=PC,y=CumPVE,geom=c("point","line"),
+      xlab = "Principal Component",
+      ylab = "Cumulative Proportion of Variance Explained")
+)
+```
+```{r}
+#Performing k-means clustering on the principal components obtained earlier.
+# We have set the number of clusters "k" to 5
+k <- 5
+kmeans_result <- kmeans(pca_data, centers = k)
+clusters <- kmeans_result$cluster
+#Calculating the quality of clustering using silhouette 
+sil <- silhouette(clusters, dist(pca_data))
+```
+
+```{r}
+#Visualizing the silhouette widths in a plot.
+fviz_silhouette(sil)
+```
+
+
+```{r}
+#Generating scatterplots of the principal components for each observation
+
+#Visualizing the first and second principal components
+fviz_pca_ind(pca_result, col.ind = clusters)
+#Visualizing the second and third principal components
+fviz_pca_ind(pca_result, col.ind = clusters, axes = c(2, 3))
+#Visualizing the third and fourth principal components
+fviz_pca_ind(pca_result, col.ind = clusters, axes = c(3, 4))
+#Visualizing the fourth and fifth principal components
+fviz_pca_ind(pca_result, col.ind = clusters, axes = c(4, 5))
+```
+
+
+
+
